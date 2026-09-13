@@ -1,0 +1,62 @@
+name: 📦 Repository History & Media Archive
+
+on:
+  workflow_dispatch:
+    inputs:
+      include_media:
+        description: '是否抓取嵌入的多媒体与附件 (图片/音频/视频/PDF)'
+        required: true
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+  issues: read
+  pull-requests: read
+
+jobs:
+  archive:
+    name: 🗄️ Dump Repository & Media
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: 🐍 Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 🚀 Execute Repository Dump
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          python tools/repo_dump.py "${{ github.repository }}" "dump"
+
+      - name: 📊 Generate Summary
+        run: |
+          if [ -f "dump/metadata.json" ]; then
+            python -c "
+          import json, os
+          data = json.load(open('dump/metadata.json'))
+          stats = data.get('stats', {})
+          mb = stats.get('media_bytes', 0) / (1024 * 1024)
+          summary = f'''
+          ## 📦 仓库归档完成报告
+          - **目标仓库**: {data.get('repository')}
+          - **Issues & PRs**: {stats.get('issues_count')} 个
+          - **讨论与评论**: {stats.get('comments_count')} 条
+          - **媒体附件**: {stats.get('media_count')} 个 ({mb:.2f} MB)
+          - **归档时间**: {stats.get('dump_time')}
+          '''
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a', encoding='utf-8') as f:
+              f.write(summary)
+          "
+          fi
+
+      - name: 📤 Upload Archive Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: repo-complete-archive-${{ github.run_id }}
+          path: dump/
+          retention-days: 30
