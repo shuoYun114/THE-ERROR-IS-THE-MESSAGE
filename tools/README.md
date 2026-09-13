@@ -4,18 +4,17 @@
 
 ## ✨ 核心特性
 
-1. **零第三方依赖**：纯 Python 3 标准库（`urllib`, `json`, `hashlib`, `re`），开箱即跑，无需 `pip install` 任何额外包。
-2. **多媒体与附件深度抓取**：
+1. **零第三方依赖**：纯 Python 3 标准库（`urllib`, `json`, `hashlib`, `re`, `html`），开箱即跑，无需 `pip install` 任何额外包。
+2. **多媒体与附件深度抓取 (三重探测引擎)**：
    - 自动解析并下载所有通过 GitHub 上传的媒体：图片（`.png`, `.jpg`）、音频（`.mp3`, `.wav`）、视频（`.mp4`）及 PDF 附件；
-   - 基于内容与 URL 计算 SHA-256 校验和与防重名哈希；
-   - 自动推断并修正 MIME 类型与文件后缀。
-3. **离线可视化网页 (`index.html`)**：
-   - 自动生成独立的暗黑模式响应式离线浏览页面；
-   - 原生支持内嵌图片展示与音频播放器控件；
-   - 完整保留克林贡语（Klingon）、Emoji 及多国语言文本。
+   - 结合 `Content-Disposition` 响应头、S3 重定向解析与哈希校验，**100% 精确保留真实文件名**；
+   - 采用 **64KB 分块流式读取与 3 次网络断线自动重试**，杜绝大文件内存暴涨与 OOM。
+3. **双重视图可视化支持**：
+   - **离线响应式网页 (`index.html`)**：全量 XSS 安全转义，暗黑主题，内嵌原生 HTML5 音频/视频播放器，无损呈现克林贡语（Klingon）与 Emoji；
+   - **GitHub 原生视图 (`SUMMARY.md`)**：自动生成结构化 Issue 与附件清单，无需解压即可在 GitHub 仓库直观预览。
 4. **移动端一键触发**：
    - 配置了 `.github/workflows/archive.yml`；
-   - 支持在手机端 GitHub App 中进入 **Actions -> Repository History & Media Archive -> Run workflow** 一键离线导出并下载 Artifact 打包。
+   - 支持在手机端 GitHub App 中进入 **Actions -> 📦 Repository History & Media Archive -> Run workflow** 一键离线导出并下载 Artifact 打包。
 
 ---
 
