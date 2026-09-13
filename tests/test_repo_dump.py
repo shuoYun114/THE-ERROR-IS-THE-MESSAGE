@@ -93,5 +93,51 @@ class TestRepoDumper(unittest.TestCase):
         self.assertIn('#60', summary_content)
         self.assertIn('`0003`', summary_content)
 
+    def test_api_get_empty_first_page(self):
+        """测试第一页响应为空时立即正常退出（绝不产生死循环）"""
+        from unittest.mock import patch, MagicMock
+        mock_resp = MagicMock()
+        mock_resp.read.return_value = b'[]'
+        mock_resp.__enter__.return_value = mock_resp
+
+        with patch('urllib.request.urlopen', return_value=mock_resp) as mock_urlopen:
+            res = self.dumper._api_get('issues')
+            self.assertEqual(res, [])
+            # 必须只调用一次，证明没有死循环
+            self.assertEqual(mock_urlopen.call_count, 1)
+
+    def test_api_get_exact_100_items_boundary(self):
+        """测试恰好100条记录时（第1页100条，第2页0条），正常终止且返回全部100条"""
+        from unittest.mock import patch, MagicMock
+        page1_data = [{'id': i} for i in range(100)]
+        page2_data = []
+
+        mock_resp1 = MagicMock()
+        mock_resp1.read.return_value = json.dumps(page1_data).encode('utf-8')
+        mock_resp1.__enter__.return_value = mock_resp1
+
+        mock_resp2 = MagicMock()
+        mock_resp2.read.return_value = json.dumps(page2_data).encode('utf-8')
+        mock_resp2.__enter__.return_value = mock_resp2
+
+        with patch('urllib.request.urlopen', side_effect=[mock_resp1, mock_resp2]) as mock_urlopen:
+            res = self.dumper._api_get('issues')
+            self.assertEqual(len(res), 100)
+            self.assertEqual(mock_urlopen.call_count, 2)
+
+    def test_api_get_partial_page(self):
+        """测试第1页不足100条时，立即终止并返回结果"""
+        from unittest.mock import patch, MagicMock
+        partial_data = [{'id': i} for i in range(42)]
+        mock_resp = MagicMock()
+        mock_resp.read.return_value = json.dumps(partial_data).encode('utf-8')
+        mock_resp.__enter__.return_value = mock_resp
+
+        with patch('urllib.request.urlopen', return_value=mock_resp) as mock_urlopen:
+            res = self.dumper._api_get('issues')
+            self.assertEqual(len(res), 42)
+            self.assertEqual(mock_urlopen.call_count, 1)
+
 if __name__ == '__main__':
     unittest.main()
+

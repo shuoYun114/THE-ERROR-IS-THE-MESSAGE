@@ -89,23 +89,13 @@ class RepoDumper:
                 query.update(params)
             url = f"https://api.github.com/repos/{self.repo}/{endpoint}?{urllib.parse.urlencode(query)}"
             
-            success = False
+            page_data = None
             for attempt in range(max_retries):
                 req = urllib.request.Request(url, headers=self.headers)
                 try:
                     with urllib.request.urlopen(req, timeout=25) as resp:
                         data = json.loads(resp.read().decode('utf-8'))
-                        if not data or not isinstance(data, list):
-                            if isinstance(data, dict):
-                                results.append(data)
-                            success = True
-                            break
-                        results.extend(data)
-                        if len(data) < per_page:
-                            success = True
-                            break
-                        page += 1
-                        success = True
+                        page_data = data
                         break
                 except Exception as e:
                     if attempt < max_retries - 1:
@@ -113,8 +103,26 @@ class RepoDumper:
                     else:
                         print(f"[-] 请求 API 失败 ({url}): {e}", file=sys.stderr)
             
-            if not success or (len(results) > 0 and len(results) % per_page != 0):
+            # 若所有重试均失败，安全终止分页退出
+            if page_data is None:
                 break
+                
+            # 若返回非列表（如单个 dict 对象），加入结果集并结束
+            if isinstance(page_data, dict):
+                results.append(page_data)
+                break
+                
+            # 若非列表或列表为空（空仓库、无记录、或分页到底），立即终止循环
+            if not isinstance(page_data, list) or len(page_data) == 0:
+                break
+                
+            results.extend(page_data)
+            
+            # 如果当前页返回数量少于 per_page，说明已到最后一页，终止循环
+            if len(page_data) < per_page:
+                break
+                
+            page += 1
                 
         return results
 
