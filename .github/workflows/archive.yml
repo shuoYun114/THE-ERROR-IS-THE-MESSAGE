@@ -39,6 +39,10 @@ jobs:
         with:
           python-version: '3.11'
 
+      - name: 🧪 Run Automated Unit Tests
+        run: |
+          python -m unittest discover tests
+
       - name: 🚀 Execute Repository Dump
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

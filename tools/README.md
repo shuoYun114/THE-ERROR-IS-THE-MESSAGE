@@ -28,7 +28,10 @@
 ### 本地直接运行：
 
 ```bash
-# 基本用法：python tools/repo_dump.py <owner/repo> [output_dir]
+# 运行单元测试套件：
+python -m unittest discover tests
+
+# 执行全量仓库与媒体归档：python tools/repo_dump.py <owner/repo> [output_dir]
 python tools/repo_dump.py "attogram/THE-ERROR-IS-THE-MESSAGE" "dump"
 ```
 
