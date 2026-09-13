@@ -8,8 +8,13 @@ on:
         required: true
         type: string
         default: 'attogram/THE-ERROR-IS-THE-MESSAGE'
+      commit_to_branch:
+        description: '是否直接将归档数据提交回仓库 archive 分支 (Direct Repo Dump)'
+        required: true
+        type: boolean
+        default: true
       include_media:
-        description: '是否抓取嵌入的多媒体与附件 (图片/音频/视频/PDF)'
+        description: '是否抓取嵌入的多媒体与附件 (图片/音频/视频/PDF/Assets)'
         required: true
         type: boolean
         default: true
@@ -21,11 +26,13 @@ permissions:
 
 jobs:
   archive:
-    name: 🗄️ Dump Repository & Media
+    name: 🗄️ Dump Repository, Releases & Media
     runs-on: ubuntu-latest
     steps:
       - name: 📥 Checkout Repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: 🐍 Set up Python 3.11
         uses: actions/setup-python@v5
@@ -37,28 +44,13 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           TARGET_REPO="${{ github.event.inputs.target_repository || 'attogram/THE-ERROR-IS-THE-MESSAGE' }}"
-          echo "Target repository: $TARGET_REPO"
+          echo "Dumping repository: $TARGET_REPO"
           python tools/repo_dump.py "$TARGET_REPO" "dump"
 
-      - name: 📊 Generate Summary
+      - name: 📊 Generate Action Summary
         run: |
-          if [ -f "dump/metadata.json" ]; then
-            python -c "
-          import json, os
-          data = json.load(open('dump/metadata.json'))
-          stats = data.get('stats', {})
-          mb = stats.get('media_bytes', 0) / (1024 * 1024)
-          summary = f'''
-          ## 📦 仓库归档完成报告
-          - **目标仓库**: {data.get('repository')}
-          - **Issues & PRs**: {stats.get('issues_count')} 个
-          - **讨论与评论**: {stats.get('comments_count')} 条
-          - **媒体附件**: {stats.get('media_count')} 个 ({mb:.2f} MB)
-          - **归档时间**: {stats.get('dump_time')}
-          '''
-          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a', encoding='utf-8') as f:
-              f.write(summary)
-          "
+          if [ -f "dump/SUMMARY.md" ]; then
+            cat dump/SUMMARY.md >> $GITHUB_STEP_SUMMARY
           fi
 
       - name: 📤 Upload Archive Artifact
@@ -67,3 +59,18 @@ jobs:
           name: repo-complete-archive-${{ github.run_id }}
           path: dump/
           retention-days: 30
+
+      - name: 💾 Direct Repo Dump (Commit & Push to archive branch)
+        if: ${{ github.event.inputs.commit_to_branch != 'false' }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          # 切换或创建干净的 archive 归档分支
+          git checkout -B archive
+          git add -f dump/
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "chore(archive): auto-dump repository history, releases and media [skip ci]"
+            git push -f origin archive || echo "Warning: Push to branch failed, artifact is safely retained."
+          fi
