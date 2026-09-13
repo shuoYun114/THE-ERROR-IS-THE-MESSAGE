@@ -26,14 +26,15 @@ if hasattr(sys.stderr, 'reconfigure'):
 
 # 附件与多媒体链接匹配正则
 MEDIA_URL_PATTERNS = [
-    # GitHub user-attachments (图片、音频、视频、PDF)
-    r'https?://github\.com/user-attachments/(?:assets|files)/[a-zA-Z0-9_\-]+(?:\.[a-zA-Z0-9]+)?',
+    # GitHub user-attachments (多层路径的 assets 与 files，支持带文件名与拓展名的 PDF 等)
+    r'https?://github\.com/user-attachments/(?:assets|files)/[^\s\)\"\'>]+',
     # 纯 HTML 标签中的 src
     r'<img\s+[^>]*?src=["\'](https?://[^"\']+)["\']',
     r'<audio\s+[^>]*?src=["\'](https?://[^"\']+)["\']',
     r'<video\s+[^>]*?src=["\'](https?://[^"\']+)["\']',
-    # Markdown 媒体语法
+    # Markdown 媒体语法与普通附件链接
     r'!\[.*?\]\((https?://[^\s\)]+)\)',
+    r'\[.*?\]\((https?://github\.com/user-attachments/[^\s\)]+)\)',
 ]
 
 class RepoDumper:
@@ -127,10 +128,12 @@ class RepoDumper:
                 content_type = resp.headers.get('Content-Type', '').split(';')[0].strip()
                 ext = mimetypes.guess_extension(content_type) or ''
                 
+                parsed_path = urllib.parse.urlparse(url).path
+                original_name = Path(parsed_path).name
+                base_ext = Path(parsed_path).suffix
+                
                 # 若 mime 无法推断，尝试从 url 提取
                 if not ext or ext == '.bin':
-                    parsed_path = urllib.parse.urlparse(url).path
-                    base_ext = Path(parsed_path).suffix
                     if base_ext and len(base_ext) < 6:
                         ext = base_ext
                     elif 'image' in content_type:
@@ -143,8 +146,14 @@ class RepoDumper:
                         ext = '.mp4'
                     else:
                         ext = '.dat'
-                        
-                file_name = f"{url_hash}{ext}"
+                
+                # 如果原始文件名有具体意义（非纯无意义 hash），保留它
+                if original_name and len(original_name) > 3 and not re.match(r'^[a-f0-9\-]{20,}$', original_name):
+                    safe_name = re.sub(r'[^a-zA-Z0-9_\-\.]', '_', original_name)
+                    file_name = f"{url_hash[:8]}_{safe_name}"
+                else:
+                    file_name = f"{url_hash}{ext}"
+                    
                 target_file = self.media_dir / file_name
                 target_file.write_bytes(content)
                 

@@ -3,6 +3,11 @@ name: 📦 Repository History & Media Archive
 on:
   workflow_dispatch:
     inputs:
+      target_repository:
+        description: '目标仓库全名 (格式: owner/repo)'
+        required: true
+        type: string
+        default: 'attogram/THE-ERROR-IS-THE-MESSAGE'
       include_media:
         description: '是否抓取嵌入的多媒体与附件 (图片/音频/视频/PDF)'
         required: true
@@ -31,7 +36,9 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          python tools/repo_dump.py "${{ github.repository }}" "dump"
+          TARGET_REPO="${{ github.event.inputs.target_repository || 'attogram/THE-ERROR-IS-THE-MESSAGE' }}"
+          echo "Target repository: $TARGET_REPO"
+          python tools/repo_dump.py "$TARGET_REPO" "dump"
 
       - name: 📊 Generate Summary
         run: |
